@@ -1,0 +1,9 @@
+# Model + server (Kaggle already ships torch/numpy/opencv; pip skips what is present)
+torch>=2.1
+numpy>=1.24
+opencv-python-headless>=4.8
+fastapi>=0.110
+uvicorn[standard]>=0.27
+gdown>=5.1
+# Only for video-file transcription and the local OpenCV webcam mode
+mediapipe>=0.10.14

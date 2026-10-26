@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.cache/
+lipvision_cache/
+*.pth
+*.pt
+*.onnx
+*.task
+*.mp4
+*.avi
+.ipynb_checkpoints/
+.DS_Store
+.idea/
+.vscode/

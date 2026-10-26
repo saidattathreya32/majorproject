@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LipVision · Live Lip Reading</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 16c4-6 8-8 13-8s9 2 13 8c-4 6-8 8-13 8S7 22 3 16Z" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M8 16c3 2.4 5.5 3.2 8 3.2s5-.8 8-3.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <span>LipVision</span><small>silent speech · real time</small>
+    </div>
+    <div class="pills">
+      <span class="pill" id="pill-server"><i></i><b>Server</b><em>connecting…</em></span>
+      <span class="pill" id="pill-face"><i></i><b>Face</b><em>—</em></span>
+      <span class="pill mono" id="pill-latency"><b>Latency</b><em>—</em></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage card">
+      <div class="video-wrap" id="video-wrap">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="speaking-badge" id="speaking-badge">● SPEAKING</div>
+        <div class="caption" id="caption"></div>
+        <div class="start-screen" id="start-screen">
+          <button class="btn primary big" id="btn-start">
+            <svg viewBox="0 0 24 24"><path d="M4 7h10a2 2 0 0 1 2 2v1.5l4-2.5v8l-4-2.5V15a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z" fill="currentColor"/></svg>
+            Start camera
+          </button>
+          <p>Video only. No microphone is used.<br>Face the camera with good, even lighting.</p>
+        </div>
+      </div>
+
+      <div class="meters">
+        <div class="model-view">
+          <canvas id="patch" width="96" height="96"></canvas>
+          <span>model view</span>
+        </div>
+        <div class="activity">
+          <div class="activity-head"><span>Lip activity</span><span class="mono" id="fps">0 fps</span></div>
+          <canvas id="spark" height="56"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel card">
+      <div class="panel-head">
+        <h2>Transcript</h2>
+        <div class="seg" role="tablist" aria-label="Trigger mode">
+          <button class="on" data-mode="auto" title="Detect speech from lip motion">Auto</button>
+          <button data-mode="manual" title="Hold SPACE (or the button) while speaking — most accurate">Push-to-talk</button>
+        </div>
+      </div>
+
+      <div class="transcript" id="transcript">
+        <p class="empty" id="empty">Start the camera and mouth a sentence silently.<br>Pause briefly at the end; the text appears here.</p>
+      </div>
+
+      <button class="btn ptt" id="btn-ptt" hidden>Hold to talk <kbd>Space</kbd></button>
+
+      <div class="actions">
+        <button class="btn" id="btn-copy">Copy</button>
+        <button class="btn" id="btn-save">Save .txt</button>
+        <button class="btn" id="btn-clear">Clear</button>
+        <label class="toggle"><input type="checkbox" id="tts"><span>Read aloud</span></label>
+      </div>
+
+      <details class="info">
+        <summary>System</summary>
+        <dl id="sysinfo"></dl>
+      </details>
+    </section>
+  </main>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
