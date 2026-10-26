@@ -17,16 +17,40 @@ The heavy model runs on a **free Kaggle GPU**. Your laptop only runs a browser t
                        free https link via Cloudflare quick tunnel (no account needed)
 ```
 
-## Quick start (Kaggle, free)
+## Quick start (Kaggle, free, recommended)
 
-1. Create a new Kaggle notebook: **File → Import Notebook**, then upload `kaggle/LipVision_Kaggle.ipynb` from this repo.
-2. In **Session options**, set **Accelerator → GPU T4 x2** and **Internet → On**.
-3. **Run All**. The last cell prints a link such as `https://something.trycloudflare.com`.
-4. Open the link in Chrome or Edge on your laptop, click **Start camera**, and mouth a sentence silently. Pause for about half a second at the end, and the text appears.
+1. On Kaggle, create a **New Notebook**.
+2. In the right sidebar (**Session options**), set **Accelerator → GPU T4 x2** and **Internet → On**.
+3. Get the code into the notebook, in either of two ways:
+   - **File → Import Notebook**, then upload `kaggle/LipVision_Kaggle.ipynb`, **or**
+   - copy the whole of [`kaggle/kaggle_cell.py`](kaggle/kaggle_cell.py) into the first cell.
+4. Click **Run All**. After 1–3 minutes, the output shows **"LipVision is live"** with an **Open LipVision** button and an embedded live view.
+5. Click **Start camera**, then mouth a sentence silently. Pause for about half a second at the end, and the text appears.
 
-The first run downloads about 1 GB of model weights. If Google Drive refuses the download (popular files sometimes hit a quota limit), get `vsr_trlrs2lrs3vox2avsp_base.pth` from the [Auto-AVSR model zoo](https://github.com/mpc001/auto_avsr#model-zoo), upload it as a Kaggle dataset and attach it with **Add Input**. The notebook finds it under `/kaggle/input` automatically.
+The notebook is a single self-contained cell, so it cannot hit the earlier `SyntaxError` (markdown run as code) or `ModuleNotFoundError` (package not on the import path). If the embedded view can't use your camera (some browsers block cameras inside notebooks), use the **Open** button, which opens a new tab. The app stays live while the notebook session runs. To restart it, run the cell again.
+
+The first run downloads about 1 GB of model weights. If Google Drive refuses the download (popular files sometimes hit a quota limit), get `vsr_trlrs2lrs3vox2avsp_base.pth` from the [Auto-AVSR model zoo](https://github.com/mpc001/auto_avsr#model-zoo), upload it as a Kaggle dataset and attach it with **Add Input**. It is found under `/kaggle/input` automatically.
 
 If this repository is private, add a Kaggle secret named `GITHUB_TOKEN` (**Add-ons → Secrets**) holding a GitHub token with read access.
+
+## Run on your own computer (VS Code)
+
+This needs Python 3.10–3.12 and a webcam. An NVIDIA GPU makes it real time; on a laptop CPU it still works, but each final transcript takes a few seconds.
+
+1. Open the `majorproject` folder in VS Code and install the **Python** extension when prompted.
+2. **Terminal → Run Task… → "LipVision: Setup"**. This creates `.venv`, installs the requirements and downloads the model (about 1 GB, once). Select `.venv` as the interpreter if VS Code asks.
+3. In **Run and Debug** (Ctrl+Shift+D), choose **"LipVision: Live in browser"** and press **F5**. Your browser opens at `http://localhost:8000` when the model is ready; click **Start camera**.
+
+The other run configurations are **Live in OpenCV window** (no browser; there is also a push-to-talk variant using Space), **Transcribe a video file**, and **Run tests**.
+
+From a plain terminal instead:
+```bash
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt                          # for an NVIDIA GPU, install CUDA torch first (pytorch.org)
+python -m lipvision                                      # opens the browser app
+python -m lipvision window [--manual]                    # OpenCV window instead
+python -m lipvision transcribe clip.mp4 --save-crops crops.mp4
+```
 
 ### Using the app
 
@@ -61,22 +85,10 @@ The old repository (`saidattathreya32/LipVision`) is left untouched. This reposi
 
 ## Other ways to run
 
-**On a machine with an NVIDIA GPU (local webcam window):**
-```bash
-pip install -r requirements.txt
-python -m lipvision.local_live            # add --manual for push-to-talk with SPACE
-```
+- **Colab or any Linux GPU VM:** run `python -m lipvision cloud`. It starts the server and prints a free public https link (a Cloudflare quick tunnel, with localhost.run as a fallback). Set `LIPVISION_NO_TUNNEL=1` if the machine is directly reachable.
+- **Transcribe video files** (offline, using the training-identical centered smoothing): `python -m lipvision transcribe a.mp4 b.mp4`. Add `--save-crops crops.mp4` to see exactly what the model sees.
 
-**Self-hosted browser mode on any GPU box:**
-```bash
-python -m lipvision.server --port 8000    # open http://localhost:8000
-```
-Browsers allow the camera only on `https://` or `localhost`. For remote access, use `scripts/launch_kaggle.py`, which also works on Colab or any Linux VM.
-
-**Transcribe video files (offline, uses the training-identical centered smoothing):**
-```bash
-python -m lipvision.transcribe clip1.mp4 clip2.mp4 --save-crops crops.mp4
-```
+Browsers allow the camera only on `https://` or `localhost`, which is why remote use goes through the https tunnel.
 
 ## Configuration
 
@@ -84,11 +96,11 @@ Every setting in `lipvision/config.py` can be overridden with an environment var
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `LIPVISION_BEAM_SIZE` | `10` | Final decode beam width. A larger beam is slightly more accurate and slower |
+| `LIPVISION_BEAM_SIZE` | auto | Final decode beam width: 10 on a GPU, 4 on a CPU. A larger beam is slightly more accurate and slower |
 | `LIPVISION_CHECKPOINT` | `vsr_trlrs2lrs3vox2avsp_base.pth` | Checkpoint name or path (`vsr_trlrs3vox2_base.pth` is a smaller-data alternative) |
 | `LIPVISION_CHECKPOINT_URL` | — | Extra download URL to try if Google Drive fails |
 | `LIPVISION_VAD_HANGOVER` | `0.6` | Seconds of still lips that end an utterance (lower = faster, but may split sentences) |
-| `LIPVISION_PARTIAL_INTERVAL` | `0.6` | Seconds between live partial transcripts |
+| `LIPVISION_PARTIAL_INTERVAL` | auto | Seconds between live partial transcripts: 0.6 on a GPU, 1.5 on a CPU |
 | `LIPVISION_MAX_UTTERANCE` | `10` | Longer speech is split and decoded in chunks |
 | `LIPVISION_DEVICE` / `LIPVISION_FP16` | `auto` / `true` | Device and half precision |
 | `LIPVISION_HOME` | `./.cache` | Where the code, weights and models are cached |
@@ -97,6 +109,8 @@ Every setting in `lipvision/config.py` can be overridden with an environment var
 
 ```
 lipvision/
+  __main__.py     `python -m lipvision` entry point (local / window / cloud / transcribe / download)
+  launch.py       cloud launcher: background server + https tunnel + notebook live panel
   config.py       settings, landmark index tables, checkpoint registry
   assets.py       fetches pinned Auto-AVSR code, weights (Kaggle input / Drive / URL), face model
   model.py        VSR model wrapper: fp16 encoder, CTC-greedy partials, joint beam-search finals
@@ -108,12 +122,14 @@ lipvision/
   transcribe.py   offline video transcription CLI
   local_live.py   local OpenCV webcam app
   web/            browser client (index.html, style.css, app.js)
-kaggle/LipVision_Kaggle.ipynb   one-click Kaggle notebook (generated by scripts/build_notebook.py)
-scripts/launch_kaggle.py        server + Cloudflare tunnel launcher
+kaggle/LipVision_Kaggle.ipynb   one-click Kaggle notebook (single code cell)
+kaggle/kaggle_cell.py           the same cell as plain text, for copy-paste
+scripts/build_notebook.py       regenerates both files above
+.vscode/                        run configurations, setup task, settings
 tests/                          pytest suite (runs without weights, using a fake model)
 ```
 
-Run the tests with `pip install -r requirements-dev.txt && pytest`.
+Run the tests with `pip install -r requirements-dev.txt && pytest`. The requirement files are `requirements.txt` for local use and `requirements-kaggle.txt` for the server extras on Kaggle.
 
 ## Limitations
 
