@@ -159,6 +159,8 @@ def launch(port: int = 8000, settings: Settings | None = None) -> str:
     try:
         info = wait_ready(settings, port, proc)
         print(f"Model ready on {info['device']} (fp16={info['fp16']}, beam={info['beam']})")
+        if os.environ.get("LIPVISION_NO_TUNNEL"):  # direct access (e.g. a VM with an open port)
+            return f"http://127.0.0.1:{port}/"
         print("Opening public https tunnel…", flush=True)
         return open_tunnel(settings, port)
     except BaseException:
