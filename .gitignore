@@ -14,4 +14,8 @@ lipvision_cache/
 .ipynb_checkpoints/
 .DS_Store
 .idea/
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json

@@ -1,0 +1,4 @@
+# Kaggle/Colab already ship torch, numpy and opencv; only the server extras are added.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+gdown>=5.1

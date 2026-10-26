@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "LipVision: Setup (create .venv and install)",
+      "type": "shell",
+      "windows": {
+        "command": "py -3 -m venv .venv; .venv\\Scripts\\python -m pip install --upgrade pip; .venv\\Scripts\\python -m pip install -r requirements.txt -r requirements-dev.txt; .venv\\Scripts\\python -m lipvision download"
+      },
+      "command": "python3 -m venv .venv && .venv/bin/python -m pip install --upgrade pip && .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt && .venv/bin/python -m lipvision download",
+      "problemMatcher": []
+    }
+  ]
+}

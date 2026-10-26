@@ -46,9 +46,9 @@ class Settings:
     fp16: bool = True               # half-precision encoder on GPU
 
     # Decoding
-    beam_size: int = 10             # final hypothesis; larger = slower, slightly better
+    beam_size: int = 0              # final-decode beam; 0 = auto (10 on GPU, 4 on CPU)
     ctc_weight: float = 0.1         # joint CTC/attention weight used in training
-    partial_interval: float = 0.6   # seconds between live partial transcripts
+    partial_interval: float = 0.0   # seconds between live partials; 0 = auto (0.6 GPU, 1.5 CPU)
 
     # Video
     fps: float = 25.0               # model was trained on 25 fps video

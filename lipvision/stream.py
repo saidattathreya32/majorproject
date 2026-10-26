@@ -123,7 +123,7 @@ class LiveSession:
             elif t - self.utt[0][0] >= self.s.max_utterance:
                 jobs += self._close(t, trim=False)
                 self._open(t)
-            elif t - self.last_partial >= self.s.partial_interval and len(self.utt) > 8:
+            elif t - self.last_partial >= (self.s.partial_interval or 0.6) and len(self.utt) > 8:
                 self.last_partial = t
                 job = self._job(self.utt, final=False)
                 if job:

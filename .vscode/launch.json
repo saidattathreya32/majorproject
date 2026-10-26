@@ -1,0 +1,67 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "LipVision: Live in browser (opens automatically)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lipvision",
+      "args": ["local"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "LipVision: Live in OpenCV window",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lipvision",
+      "args": ["window"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "LipVision: Live window, push-to-talk (SPACE)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lipvision",
+      "args": ["window", "--manual"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "LipVision: Transcribe a video file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lipvision",
+      "args": ["transcribe", "${input:videoPath}", "--save-crops", "crops.mp4"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "LipVision: Download model (first-time setup)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "lipvision",
+      "args": ["download"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "LipVision: Run tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "videoPath",
+      "type": "promptString",
+      "description": "Path to a video file to transcribe"
+    }
+  ]
+}

@@ -50,6 +50,11 @@ class VSRModel:
         self.settings = settings
         self.device = _resolve_device(settings.device)
         self.fp16 = settings.fp16 and self.device.type == "cuda"
+        gpu = self.device.type == "cuda"
+        if settings.beam_size <= 0:  # keep a laptop CPU responsive
+            settings.beam_size = 10 if gpu else 4
+        if settings.partial_interval <= 0:
+            settings.partial_interval = 0.6 if gpu else 1.5
         if net is None:
             root = assets.auto_avsr_dir(settings)
             from espnet.nets.pytorch_backend.e2e_asr_conformer import E2E
