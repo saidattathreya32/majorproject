@@ -31,7 +31,7 @@ The notebook is a single self-contained cell, so it cannot hit the earlier `Synt
 
 The first run downloads about 1 GB of model weights. If Google Drive refuses the download (popular files sometimes hit a quota limit), get `vsr_trlrs2lrs3vox2avsp_base.pth` from the [Auto-AVSR model zoo](https://github.com/mpc001/auto_avsr#model-zoo), upload it as a Kaggle dataset and attach it with **Add Input**. It is found under `/kaggle/input` automatically.
 
-If this repository is private, add a Kaggle secret named `GITHUB_TOKEN` (**Add-ons → Secrets**) holding a GitHub token with read access.
+The notebook works even though this repository is private: it carries a built-in copy of the app and uses it when GitHub asks for a login. To have it always pull the newest code from GitHub instead, add a Kaggle secret named `GITHUB_TOKEN` (**Add-ons → Secrets**) holding a GitHub token with read access, or make the repository public. After changing anything in `lipvision/`, run `python scripts/build_notebook.py` to refresh the built-in copy; a test fails if you forget.
 
 ## Run on your own computer (VS Code)
 

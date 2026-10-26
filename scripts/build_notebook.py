@@ -1,13 +1,23 @@
-"""Regenerates kaggle/LipVision_Kaggle.ipynb and kaggle/kaggle_cell.py from CELL below.
+"""Regenerates kaggle/LipVision_Kaggle.ipynb and kaggle/kaggle_cell.py.
 
-The notebook is deliberately code-only (no markdown cells): if a notebook is pasted
-or imported as plain text, markdown would be executed as Python and fail.
+The notebook is a single code cell (markdown cells get executed as Python when a
+notebook is pasted or imported as text). It also embeds a zipped copy of the
+`lipvision` package, so Run All works even when the GitHub repo is private and
+no token is configured; when the repo is reachable, git is used to stay current.
+
+Run this after changing anything under lipvision/ (a test checks it is in sync).
 """
 
+import base64
+import io
 import json
+import zipfile
 from pathlib import Path
 
-CELL = r'''# 👄 LipVision: real-time silent lip reading on a free Kaggle GPU
+ROOT = Path(__file__).resolve().parent.parent
+BUNDLED = ["lipvision", "requirements-kaggle.txt"]
+
+HEAD = r'''# 👄 LipVision: real-time silent lip reading on a free Kaggle GPU
 #
 #  1. Notebook settings (right sidebar > Session options):
 #       Accelerator = GPU T4 x2      Internet = On
@@ -15,62 +25,110 @@ CELL = r'''# 👄 LipVision: real-time silent lip reading on a free Kaggle GPU
 #     (or use the embedded view), press "Start camera", and mouth sentences silently.
 #     Video only: the microphone is never used.
 #
+#  Works with a private repo too: if GitHub can't be reached without a login, the copy
+#  of LipVision built into this cell is used. (Optional: add a Kaggle secret named
+#  GITHUB_TOKEN to always pull the latest code from GitHub.)
 #  Weights (~1 GB) download automatically. If Google Drive refuses (quota limit),
-#  attach vsr_trlrs2lrs3vox2avsp_base.pth as a Kaggle dataset ("Add Input"); it is
-#  found automatically. Private repo? Add a Kaggle secret named GITHUB_TOKEN.
+#  attach vsr_trlrs2lrs3vox2avsp_base.pth as a Kaggle dataset ("Add Input").
 
-import os, sys, subprocess
+import base64, io, os, shutil, subprocess, sys, zipfile
 
 REPO = "https://github.com/saidattathreya32/majorproject"
 BRANCH = ""  # empty = the repository's default branch
 WORK = "/kaggle/working" if os.path.isdir("/kaggle/working") else os.path.abspath(".")
 APP = os.path.join(WORK, "majorproject")
 
-token = None
-try:
-    from kaggle_secrets import UserSecretsClient
-    token = UserSecretsClient().get_secret("GITHUB_TOKEN")
-except Exception:
-    pass
+
+def github_token():
+    try:
+        from kaggle_secrets import UserSecretsClient
+        return UserSecretsClient().get_secret("GITHUB_TOKEN")
+    except Exception:
+        return None
 
 
-def sh(cmd):
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode:
-        out = (r.stdout + r.stderr)[-3000:]
-        raise RuntimeError(f"Command failed: {' '.join(cmd)}\n{out}".replace(token or "\0", "***"))
-    return r.stdout
+def git(*args, token=None):
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")  # never hang on a login prompt
+    r = subprocess.run(["git", *args], capture_output=True, text=True, env=env)
+    msg = (r.stdout + r.stderr).strip().replace(token or "\0", "***")
+    return r.returncode == 0, msg
 
 
-url = REPO.replace("https://", f"https://{token}@") if token else REPO
-if os.path.isdir(os.path.join(APP, ".git")):
-    sh(["git", "-C", APP, "pull", "-q", "--ff-only"])
-else:
-    sh(["git", "clone", "-q", "--depth", "1", *(["-b", BRANCH] if BRANCH else []), url, APP])
-print("Code:", sh(["git", "-C", APP, "log", "-1", "--format=%h %s"]).strip())
-
-print("Installing packages…", flush=True)
-sh([sys.executable, "-m", "pip", "install", "-q", "-r", os.path.join(APP, "requirements-kaggle.txt")])
-
-os.environ["LIPVISION_HOME"] = os.path.join(WORK, "lipvision_cache")
-if APP not in sys.path:
-    sys.path.insert(0, APP)  # os.chdir alone does not make a package importable in Jupyter
-os.chdir(APP)
-for name in [m for m in sys.modules if m == "lipvision" or m.startswith("lipvision.")]:
-    del sys.modules[name]  # re-running the cell picks up freshly pulled code
-
-from lipvision.launch import launch_in_notebook
-
-launch_in_notebook()
-'''
+def get_code():
+    """Latest code from GitHub if reachable, else the copy embedded in this cell."""
+    token = github_token()
+    url = REPO.replace("https://", f"https://{token}@") if token else REPO
+    if os.path.isdir(os.path.join(APP, ".git")):
+        ok, msg = git("-C", APP, "pull", "-q", "--ff-only", token=token)
+        if ok:
+            return "GitHub (updated)"
+        print("git pull failed, keeping the existing copy:", msg[-300:])
+        return "GitHub (cached)"
+    tmp = APP + ".clone"
+    shutil.rmtree(tmp, ignore_errors=True)
+    ok, msg = git("clone", "-q", "--depth", "1", *(["-b", BRANCH] if BRANCH else []), url, tmp, token=token)
+    shutil.rmtree(APP, ignore_errors=True)
+    if ok:
+        os.rename(tmp, APP)
+        return "GitHub"
+    shutil.rmtree(tmp, ignore_errors=True)
+    os.makedirs(APP)
+    zipfile.ZipFile(io.BytesIO(base64.b64decode("".join(BUNDLE)))).extractall(APP)
+    return "built-in copy (GitHub repo not reachable without a login; that's fine)"
 
 
 def main():
-    out_dir = Path(__file__).resolve().parent.parent / "kaggle"
+    print("Code source:", get_code(), flush=True)
+    print("Installing packages…", flush=True)
+    r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r",
+                        os.path.join(APP, "requirements-kaggle.txt")], capture_output=True, text=True)
+    if r.returncode:
+        raise RuntimeError("pip install failed (is Internet on?):\n" + r.stderr[-2000:])
+    os.environ["LIPVISION_HOME"] = os.path.join(WORK, "lipvision_cache")
+    if APP not in sys.path:
+        sys.path.insert(0, APP)  # os.chdir alone does not make a package importable in Jupyter
+    os.chdir(APP)
+    for name in [m for m in sys.modules if m == "lipvision" or m.startswith("lipvision.")]:
+        del sys.modules[name]  # re-running the cell picks up fresh code
+    from lipvision.launch import launch_in_notebook
+    launch_in_notebook()
+
+
+# Zipped copy of the lipvision package (generated by scripts/build_notebook.py).
+'''
+
+TAIL = "\n\nmain()\n"
+
+
+def bundle_bytes() -> bytes:
+    """Deterministic zip of the app (fixed timestamps, sorted entries)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for top in BUNDLED:
+            p = ROOT / top
+            files = sorted(f for f in p.rglob("*") if f.is_file()) if p.is_dir() else [p]
+            for f in files:
+                if "__pycache__" in f.parts or f.suffix == ".pyc":
+                    continue
+                info = zipfile.ZipInfo(f.relative_to(ROOT).as_posix(), date_time=(2020, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                z.writestr(info, f.read_bytes())
+    return buf.getvalue()
+
+
+def build_cell() -> str:
+    b64 = base64.b64encode(bundle_bytes()).decode()
+    lines = ",\n".join(f'    "{b64[i:i + 100]}"' for i in range(0, len(b64), 100))
+    return HEAD + f"BUNDLE = [\n{lines},\n]" + TAIL
+
+
+def main():
+    cell = build_cell()
+    out_dir = ROOT / "kaggle"
     out_dir.mkdir(exist_ok=True)
     nb = {
         "cells": [{"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [],
-                   "source": CELL.splitlines(keepends=True)}],
+                   "source": cell.splitlines(keepends=True)}],
         "metadata": {
             "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
             "language_info": {"name": "python"},
@@ -80,8 +138,9 @@ def main():
         "nbformat_minor": 5,
     }
     (out_dir / "LipVision_Kaggle.ipynb").write_text(json.dumps(nb, indent=1, ensure_ascii=False) + "\n")
-    (out_dir / "kaggle_cell.py").write_text(CELL)
-    print("wrote", out_dir / "LipVision_Kaggle.ipynb", "and", out_dir / "kaggle_cell.py")
+    (out_dir / "kaggle_cell.py").write_text(cell)
+    print("wrote", out_dir / "LipVision_Kaggle.ipynb", "and", out_dir / "kaggle_cell.py",
+          f"({len(cell) // 1024} KB)")
 
 
 if __name__ == "__main__":
