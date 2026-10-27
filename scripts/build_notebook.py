@@ -42,6 +42,7 @@ EVAL_LABEL = "baseline"
 
 REPO = "https://github.com/saidattathreya32/majorproject"
 BRANCH = ""  # empty = the repository's default branch
+PIN = ""     # e.g. "v1.0" to always run that release; empty = newest working release
 WORK = "/kaggle/working" if os.path.isdir("/kaggle/working") else os.path.abspath(".")
 APP = os.path.join(WORK, "majorproject")
 
@@ -61,31 +62,51 @@ def git(*args, token=None):
     return r.returncode == 0, msg
 
 
-def get_code():
-    """Latest code from GitHub if reachable, else the copy embedded in this cell."""
+def release_tags(url, token):
+    """Release tags (v1.0, v1.1, ...) on the remote, newest first. Empty if unreachable."""
+    ok, out = git("ls-remote", "--tags", url, token=token)
+    tags = {line.split("refs/tags/")[1].removesuffix("^{}") for line in out.splitlines()
+            if ok and "refs/tags/v" in line}
+
+    def key(t):
+        try:
+            return [int(x) for x in t[1:].split(".")]
+        except ValueError:
+            return [-1]
+    return sorted((t for t in tags if key(t) != [-1]), key=key, reverse=True)
+
+
+def candidates():
+    """Versions to try, best first: pinned or newest release, older releases, then fallbacks."""
     token = github_token()
     url = REPO.replace("https://", f"https://{token}@") if token else REPO
-    if os.path.isdir(os.path.join(APP, ".git")):
-        ok, msg = git("-C", APP, "pull", "-q", "--ff-only", token=token)
-        if ok:
-            return "GitHub (updated)"
-        print("git pull failed, keeping the existing copy:", msg[-300:])
-        return "GitHub (cached)"
-    tmp = APP + ".clone"
-    shutil.rmtree(tmp, ignore_errors=True)
-    ok, msg = git("clone", "-q", "--depth", "1", *(["-b", BRANCH] if BRANCH else []), url, tmp, token=token)
+    tags = release_tags(url, token)
+    if PIN:
+        tags = [PIN] + [t for t in tags if t != PIN]
+    out = [(t, url, token) for t in tags[:3]]  # newest 3 releases is enough history
+    if not tags:
+        out.append((BRANCH or "latest", url, token))
+    out.append(("built-in", None, None))
+    return out
+
+
+def get_code(ref, url, token):
+    """Put version `ref` in APP. Returns a description, or raises if it cannot be fetched."""
+    os.chdir(WORK)  # a failed attempt left us inside APP; deleting it would break git and pip
     shutil.rmtree(APP, ignore_errors=True)
-    if ok:
-        os.rename(tmp, APP)
-        return "GitHub"
-    shutil.rmtree(tmp, ignore_errors=True)
-    os.makedirs(APP)
-    zipfile.ZipFile(io.BytesIO(base64.b64decode("".join(BUNDLE)))).extractall(APP)
-    return "built-in copy (GitHub repo not reachable without a login; that's fine)"
+    if ref == "built-in":
+        os.makedirs(APP)
+        zipfile.ZipFile(io.BytesIO(base64.b64decode("".join(BUNDLE)))).extractall(APP)
+        return "built-in copy (known-good snapshot inside this cell)"
+    branch = [] if ref == "latest" else ["-b", ref]
+    ok, msg = git("clone", "-q", "--depth", "1", *branch, url, APP, token=token)
+    if not ok:
+        raise RuntimeError("GitHub not reachable without a login: " + msg[-200:])
+    return f"GitHub {ref}"
 
 
-def main():
-    print("Code source:", get_code(), flush=True)
+def start(ref, url, token):
+    print(f"Code source: {get_code(ref, url, token)}", flush=True)
     print("Installing packages…", flush=True)
     r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r",
                         os.path.join(APP, "requirements-kaggle.txt")], capture_output=True, text=True)
@@ -96,13 +117,32 @@ def main():
         sys.path.insert(0, APP)  # os.chdir alone does not make a package importable in Jupyter
     os.chdir(APP)
     for name in [m for m in sys.modules if m == "lipvision" or m.startswith("lipvision.")]:
-        del sys.modules[name]  # re-running the cell picks up fresh code
+        del sys.modules[name]  # re-running the cell (or falling back) picks up fresh code
     if MODE == "evaluate":
         from lipvision.evaluate import run_in_notebook
-        run_in_notebook(EVAL_LABEL)
-        return
+        return run_in_notebook(EVAL_LABEL)
     from lipvision.launch import launch_in_notebook
-    launch_in_notebook()
+    return launch_in_notebook()
+
+
+def main():
+    """Try the newest release; if it fails to start, fall back to the previous one automatically."""
+    failures = []
+    for ref, url, token in candidates():
+        try:
+            result = start(ref, url, token)
+        except Exception as e:
+            failures.append(f"{ref}: {e}")
+            print(f"⚠️ {ref} failed: {str(e)[-400:]}\n   Falling back to the previous version…", flush=True)
+            try:
+                from lipvision.launch import stop
+                stop()  # free the port before the next attempt
+            except Exception:
+                pass
+            continue
+        print(f"✅ Running {ref}" + (f" (fallback after: {'; '.join(failures)})" if failures else ""))
+        return result
+    raise RuntimeError("Every version failed to start:\n" + "\n".join(failures))
 
 
 # Zipped copy of the lipvision package (generated by scripts/build_notebook.py).
