@@ -62,12 +62,67 @@ def test_private_repo_falls_back_to_embedded_copy(tmp_path):
                       f'REPO = "file://{tmp_path}/does-not-exist"')
     src = src[:src.rindex("main()")]  # define everything, don't launch
     env = dict(os.environ)
-    code = src + ("\nprint('SOURCE=' + get_code())\nsys.path.insert(0, APP)\n"
+    code = src + ("\nfor c in candidates():\n    try:\n        print('SOURCE=' + get_code(*c)); break\n    except Exception:\n        pass\nsys.path.insert(0, APP)\n"
                   "import lipvision.launch, lipvision.server\nprint('FROM=' + lipvision.__file__)")
     r = subprocess.run([sys.executable, "-c", code], cwd=tmp_path, capture_output=True, text=True, env=env)
     out = r.stdout + r.stderr
     assert "SOURCE=built-in copy" in out, out
     assert f"FROM={tmp_path}/majorproject/lipvision/__init__.py" in out, out
+
+
+def _fake_release_repo(path, good_tags, bad_tags):
+    """A git repo whose tags each hold a tiny lipvision package; bad tags fail to launch."""
+    def sh(*a):
+        subprocess.run(["git", "-C", str(path), *a], check=True, capture_output=True)
+
+    path.mkdir()
+    sh("init", "-q", "-b", "main")
+    (path / "requirements-kaggle.txt").write_text("")
+    pkg = path / "lipvision"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    for tag in sorted(good_tags + bad_tags, key=lambda t: [int(x) for x in t[1:].split(".")]):
+        body = (f"raise RuntimeError('broken release {tag}')" if tag in bad_tags
+                else f"print('LAUNCHED {tag}'); return 'url-{tag}'")
+        (pkg / "launch.py").write_text(f"def launch_in_notebook():\n    {body}\n")
+        sh("add", "-A")
+        sh("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", tag)
+        sh("tag", tag)
+    return path
+
+
+def _run_cell_main(tmp_path, repo_url, extra=""):
+    src = _cell_source()
+    src = src.replace('REPO = "https://github.com/saidattathreya32/majorproject"', f'REPO = "{repo_url}"')
+    src = src.replace('WORK = "/kaggle/working"', f'WORK = "{tmp_path}/work"')
+    src = src[:src.rindex("main()")] + extra + "\nmain()\n"
+    (tmp_path / "work").mkdir(exist_ok=True)
+    r = subprocess.run([sys.executable, "-c", src], cwd=tmp_path, capture_output=True, text=True,
+                       env=dict(os.environ))
+    return r.returncode, r.stdout + r.stderr
+
+
+def test_broken_newest_release_rolls_back_to_previous(tmp_path):
+    repo = _fake_release_repo(tmp_path / "remote", good_tags=["v1.0"], bad_tags=["v1.1"])
+    code, out = _run_cell_main(tmp_path, f"file://{repo}")
+    assert code == 0, out
+    assert "v1.1 failed" in out and "broken release v1.1" in out, out
+    assert "LAUNCHED v1.0" in out, out
+    assert "Running v1.0" in out, out
+
+
+def test_newest_good_release_is_used_without_fallback(tmp_path):
+    repo = _fake_release_repo(tmp_path / "remote", good_tags=["v1.0", "v1.2"], bad_tags=[])
+    code, out = _run_cell_main(tmp_path, f"file://{repo}")
+    assert code == 0, out
+    assert "LAUNCHED v1.2" in out and "LAUNCHED v1.0" not in out, out
+
+
+def test_pinned_version_is_honoured(tmp_path):
+    repo = _fake_release_repo(tmp_path / "remote", good_tags=["v1.0", "v1.1"], bad_tags=[])
+    code, out = _run_cell_main(tmp_path, f"file://{repo}", extra='\nPIN = "v1.0"\n')
+    assert code == 0, out
+    assert "LAUNCHED v1.0" in out and "LAUNCHED v1.1" not in out, out
 
 
 def test_cli_forwards_transcribe_args(monkeypatch):
