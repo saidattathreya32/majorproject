@@ -33,6 +33,13 @@ HEAD = r'''# 👄 LipVision: real-time silent lip reading on a free Kaggle GPU
 
 import base64, io, os, shutil, subprocess, sys, zipfile
 
+# MODE = "live"      -> open the live lip-reading app (default)
+# MODE = "evaluate"  -> measure accuracy on your clips: attach a dataset that holds the
+#                       videos and a manifest.csv (path, speaker, reference), then Run All.
+#                       Results are saved under /kaggle/working/results/<EVAL_LABEL>.
+MODE = "live"
+EVAL_LABEL = "baseline"
+
 REPO = "https://github.com/saidattathreya32/majorproject"
 BRANCH = ""  # empty = the repository's default branch
 WORK = "/kaggle/working" if os.path.isdir("/kaggle/working") else os.path.abspath(".")
@@ -90,6 +97,10 @@ def main():
     os.chdir(APP)
     for name in [m for m in sys.modules if m == "lipvision" or m.startswith("lipvision.")]:
         del sys.modules[name]  # re-running the cell picks up fresh code
+    if MODE == "evaluate":
+        from lipvision.evaluate import run_in_notebook
+        run_in_notebook(EVAL_LABEL)
+        return
     from lipvision.launch import launch_in_notebook
     launch_in_notebook()
 
