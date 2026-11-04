@@ -1,4 +1,4 @@
-# 👄 LipVision 4.0: Real-Time Silent Lip Reading
+# 👄 LipVision
 
 LipVision reads sentences from lip movement alone, live from your webcam. It uses video only: no microphone is opened and no audio is used.
 
